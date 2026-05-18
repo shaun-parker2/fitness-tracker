@@ -6,11 +6,11 @@ A lightweight two-profile fitness tracker PWA for Shaun and Jemma.
 
 ## What it tracks
 - **Weight** (daily, charted with a 7-day moving average so noise doesn't demotivate)
-- **3 KPIs** per day (one tap each):
+- **4 KPIs** per day (one tap each):
   - Steps ≥ 8,000
   - Low/no UPF day
   - Exercise (run or weights)
-- **Beers** counter (because Thu–Sun is real life)
+  - No booze
 - **Free-text note**
 - **Backfill for missed days** with the date picker on the Log tab
 
@@ -19,8 +19,7 @@ A lightweight two-profile fitness tracker PWA for Shaun and Jemma.
 - Exercise this week side-by-side
 - Last-30-day KPI completion side-by-side
 - Current streaks side-by-side
-- 21-day traffic-light matrix for all three KPIs
-- Beers total + weekly average
+- 21-day traffic-light matrix for all four KPIs
 
 ## Run locally
 Just open `index.html` in a browser. For service-worker / PWA install to work, you need to serve it over HTTP(S) (not `file://`).

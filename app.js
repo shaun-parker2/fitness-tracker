@@ -4,7 +4,7 @@
    ============================================================ */
 
 const STORAGE_KEY = "trend.v1"; // same key; in-place migrate v1 -> v2
-const KPIS = ["steps8k", "lowUpf", "exercise"];
+const KPIS = ["steps8k", "lowUpf", "exercise", "noBooze"];
 const PROFILE_META = {
   shaun: { name: "Shaun", color: "#4ade80" },
   jemma: { name: "Jemma", color: "#f472b6" },
@@ -75,7 +75,7 @@ function saveStore(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 function getEntries(profileId) { return store.profiles[profileId].entries; }
 function getEntry(profileId, dateStr) {
   return getEntries(profileId)[dateStr] || {
-    weight: null, steps8k: false, lowUpf: false, exercise: false, beers: 0, note: "",
+    weight: null, steps8k: false, lowUpf: false, exercise: false, noBooze: false, note: "",
   };
 }
 function setEntry(profileId, dateStr, patch) {
@@ -83,8 +83,7 @@ function setEntry(profileId, dateStr, patch) {
   const next = { ...cur, ...patch, _updatedAt: new Date().toISOString() };
   const hasData =
     next.weight != null ||
-    next.steps8k || next.lowUpf || next.exercise ||
-    next.beers > 0 ||
+    next.steps8k || next.lowUpf || next.exercise || next.noBooze ||
     (next.note && next.note.trim().length > 0);
   const entries = getEntries(profileId);
   if (hasData) entries[dateStr] = next;
@@ -129,8 +128,7 @@ function entryHasData(e) {
   return !!(
     e && (
       e.weight != null ||
-      e.steps8k || e.lowUpf || e.exercise ||
-      (e.beers || 0) > 0 ||
+      e.steps8k || e.lowUpf || e.exercise || e.noBooze ||
       (e.note && e.note.trim().length > 0)
     )
   );
@@ -157,7 +155,8 @@ async function pushEntryToCloud(profileId, dateStr) {
     steps8k: !!e.steps8k,
     low_upf: !!e.lowUpf,
     exercise: !!e.exercise,
-    beers: e.beers || 0,
+    // Reuse the existing int column as a boolean sentinel to avoid a schema migration.
+    beers: e.noBooze ? -1 : 0,
     note: e.note || "",
     updated_at: new Date().toISOString(),
   };
@@ -189,7 +188,7 @@ async function pullCloudToLocal() {
       steps8k: !!r.steps8k,
       lowUpf: !!r.low_upf,
       exercise: !!r.exercise,
-      beers: r.beers || 0,
+      noBooze: r.beers === -1,
       note: r.note || "",
       _updatedAt: r.updated_at || new Date().toISOString(),
     };
@@ -239,7 +238,6 @@ function renderLog() {
   $("#todayBtn").disabled = t === today();
   $("#logWho").textContent = PROFILE_META[p].name;
   $("#weight").value = e.weight ?? "";
-  $("#beersVal").textContent = e.beers || 0;
   $("#note").value = e.note || "";
   $("#submitBtn").textContent = t === today() ? "Save today" : `Save ${fmtNice(t)}`;
 
@@ -308,20 +306,6 @@ function bindLog() {
       const e = getEntry(profileId, dateStr);
       setEntry(profileId, dateStr, { [k]: !e[k] });
       renderLog();
-      syncEntry(profileId, dateStr, { silent: true });
-      flashSaved();
-    });
-  });
-
-  $$(".step-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const delta = Number(btn.dataset.step);
-      const profileId = activeProfile();
-      const dateStr = currentLogDate;
-      const e = getEntry(profileId, dateStr);
-      const next = Math.max(0, (e.beers || 0) + delta);
-      setEntry(profileId, dateStr, { beers: next });
-      $("#beersVal").textContent = next;
       syncEntry(profileId, dateStr, { silent: true });
       flashSaved();
     });
@@ -438,11 +422,6 @@ function exerciseThisWeek(profileId) {
   const entries = getEntries(profileId);
   return weekRange().filter((d) => entries[d] && entries[d].exercise).length;
 }
-function beersLast30(profileId) {
-  const entries = getEntries(profileId);
-  return lastNDates(30).reduce((sum, d) => sum + ((entries[d] && entries[d].beers) || 0), 0);
-}
-
 // ---------- STATS view ----------
 let weightChart = null;
 
@@ -486,23 +465,20 @@ function renderStats() {
   $("#pctShaunSteps").textContent = pct30("shaun", "steps8k") + "%";
   $("#pctShaunUpf").textContent = pct30("shaun", "lowUpf") + "%";
   $("#pctShaunEx").textContent = pct30("shaun", "exercise") + "%";
+  $("#pctShaunNoBooze").textContent = pct30("shaun", "noBooze") + "%";
   $("#pctJemmaSteps").textContent = pct30("jemma", "steps8k") + "%";
   $("#pctJemmaUpf").textContent = pct30("jemma", "lowUpf") + "%";
   $("#pctJemmaEx").textContent = pct30("jemma", "exercise") + "%";
+  $("#pctJemmaNoBooze").textContent = pct30("jemma", "noBooze") + "%";
 
   $("#stkShaunSteps").textContent = currentStreak("shaun", "steps8k");
   $("#stkShaunUpf").textContent = currentStreak("shaun", "lowUpf");
   $("#stkShaunEx").textContent = currentStreak("shaun", "exercise");
+  $("#stkShaunNoBooze").textContent = currentStreak("shaun", "noBooze");
   $("#stkJemmaSteps").textContent = currentStreak("jemma", "steps8k");
   $("#stkJemmaUpf").textContent = currentStreak("jemma", "lowUpf");
   $("#stkJemmaEx").textContent = currentStreak("jemma", "exercise");
-
-  const shaunBeers = beersLast30("shaun");
-  const jemmaBeers = beersLast30("jemma");
-  $("#beersShaun").textContent = shaunBeers;
-  $("#beersJemma").textContent = jemmaBeers;
-  $("#beersShaunAvg").textContent = ((shaunBeers / 30) * 7).toFixed(1) + " / wk";
-  $("#beersJemmaAvg").textContent = ((jemmaBeers / 30) * 7).toFixed(1) + " / wk";
+  $("#stkJemmaNoBooze").textContent = currentStreak("jemma", "noBooze");
 }
 
 function drawWeightChart() {
@@ -591,7 +567,7 @@ function drawTrafficLights() {
     const grid = document.createElement("div");
     grid.className = "tl-grid";
 
-    const kpiLabels = { steps8k: "Steps", lowUpf: "Low UPF", exercise: "Exercise" };
+    const kpiLabels = { steps8k: "Steps", lowUpf: "Low UPF", exercise: "Exercise", noBooze: "No booze" };
     KPIS.forEach((k) => {
       const lbl = document.createElement("div");
       lbl.className = "tl-row-label";
@@ -634,15 +610,15 @@ function renderHistory() {
     const flags =
       (e.steps8k ? "🟢" : "⚪") +
       (e.lowUpf ? "🟢" : "⚪") +
-      (e.exercise ? "🟢" : "⚪");
+      (e.exercise ? "🟢" : "⚪") +
+      (e.noBooze ? "🟢" : "⚪");
     const w = e.weight != null ? e.weight.toFixed(1) + " kg" : "—";
-    const beers = e.beers ? ` · 🍺×${e.beers}` : "";
     return `<div class="history-row">
       <div>
         <div class="history-date">${fmtNice(k)}</div>
         <div class="history-w">${w}</div>
       </div>
-      <div class="muted" style="font-size:12px">${e.note ? escapeHtml(e.note) : ""}${beers}</div>
+      <div class="muted" style="font-size:12px">${e.note ? escapeHtml(e.note) : ""}</div>
       <div class="history-kpis">${flags}</div>
     </div>`;
   }).join("");

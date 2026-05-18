@@ -163,26 +163,6 @@ textarea { resize: vertical; }
 .kpi-btn.done { background: var(--accent-dim); border-color: var(--accent); }
 .kpi-btn.done .kpi-state { color: var(--accent); font-weight: 600; }
 
-/* Stepper */
-.stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
-}
-.stepper > span { font-size: 24px; font-weight: 600; min-width: 40px; text-align: center; }
-.step-btn {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  color: var(--text);
-  width: 46px; height: 46px;
-  border-radius: 10px; font-size: 22px; cursor: pointer;
-}
-.step-btn:active { background: var(--bg-elev-2); }
-
 .btn-submit {
   width: 100%;
   padding: 16px;

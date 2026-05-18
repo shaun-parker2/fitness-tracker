@@ -63,15 +63,11 @@
           <div class="kpi-title">Exercise (run / weights)</div>
           <div class="kpi-state">Tap to mark done</div>
         </button>
-      </div>
-
-      <div class="card">
-        <label class="card-label">Beers</label>
-        <div class="stepper">
-          <button class="step-btn" data-step="-1">−</button>
-          <span id="beersVal">0</span>
-          <button class="step-btn" data-step="1">+</button>
-        </div>
+        <button class="kpi-btn" data-kpi="noBooze">
+          <div class="kpi-icon">🚫</div>
+          <div class="kpi-title">No booze</div>
+          <div class="kpi-state">Tap to mark done</div>
+        </button>
       </div>
 
       <div class="card">
@@ -134,19 +130,21 @@
       <div class="card">
         <div class="card-label">Last 30 days — KPI completion</div>
         <table class="compare-table">
-          <thead><tr><th></th><th>Steps</th><th>Low UPF</th><th>Exercise</th></tr></thead>
+          <thead><tr><th></th><th>Steps</th><th>Low UPF</th><th>Exercise</th><th>No booze</th></tr></thead>
           <tbody>
             <tr>
               <td><span class="profile-dot" style="background:#4ade80"></span>Shaun</td>
               <td id="pctShaunSteps">—</td>
               <td id="pctShaunUpf">—</td>
               <td id="pctShaunEx">—</td>
+              <td id="pctShaunNoBooze">—</td>
             </tr>
             <tr>
               <td><span class="profile-dot" style="background:#f472b6"></span>Jemma</td>
               <td id="pctJemmaSteps">—</td>
               <td id="pctJemmaUpf">—</td>
               <td id="pctJemmaEx">—</td>
+              <td id="pctJemmaNoBooze">—</td>
             </tr>
           </tbody>
         </table>
@@ -155,38 +153,24 @@
       <div class="card">
         <div class="card-label">Current streaks (days)</div>
         <table class="compare-table">
-          <thead><tr><th></th><th>Steps</th><th>Low UPF</th><th>Exercise</th></tr></thead>
+          <thead><tr><th></th><th>Steps</th><th>Low UPF</th><th>Exercise</th><th>No booze</th></tr></thead>
           <tbody>
             <tr>
               <td><span class="profile-dot" style="background:#4ade80"></span>Shaun</td>
               <td id="stkShaunSteps">0</td>
               <td id="stkShaunUpf">0</td>
               <td id="stkShaunEx">0</td>
+              <td id="stkShaunNoBooze">0</td>
             </tr>
             <tr>
               <td><span class="profile-dot" style="background:#f472b6"></span>Jemma</td>
               <td id="stkJemmaSteps">0</td>
               <td id="stkJemmaUpf">0</td>
               <td id="stkJemmaEx">0</td>
+              <td id="stkJemmaNoBooze">0</td>
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <div class="card">
-        <div class="card-label">Beers — last 30 days</div>
-        <div class="versus">
-          <div class="versus-side">
-            <div class="versus-name"><span class="profile-dot" style="background:#4ade80"></span>Shaun</div>
-            <div class="versus-num" id="beersShaun">0</div>
-            <div class="summary-sub muted" id="beersShaunAvg">0.0 / wk</div>
-          </div>
-          <div class="versus-side">
-            <div class="versus-name"><span class="profile-dot" style="background:#f472b6"></span>Jemma</div>
-            <div class="versus-num" id="beersJemma">0</div>
-            <div class="summary-sub muted" id="beersJemmaAvg">0.0 / wk</div>
-          </div>
-        </div>
       </div>
     </section>
 
