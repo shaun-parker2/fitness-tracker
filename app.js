@@ -5,6 +5,7 @@
 
 const STORAGE_KEY = "trend.v1"; // same key; in-place migrate v1 -> v2
 const WEIGHT_UNIT_KEY = "trend.weightUnit.v1";
+const WEIGHT_UNIT_PREFS_KEY = "trend.weightUnitByProfile.v1";
 const KPIS = ["steps8k", "lowUpf", "exercise", "noBooze"];
 const PROFILE_META = {
   shaun: { name: "Shaun", color: "#4ade80" },
@@ -38,18 +39,39 @@ const clampLogDate = (s) => (!s || isFutureDate(s) ? today() : s);
 const KG_PER_LB = 0.45359237;
 const LB_PER_ST = 14;
 
-function loadWeightUnit() {
+function loadWeightUnitPrefs() {
+  const defaults = { shaun: "kg", jemma: "kg" };
   try {
-    const v = localStorage.getItem(WEIGHT_UNIT_KEY);
-    return v === "stlb" ? "stlb" : "kg";
+    const raw = localStorage.getItem(WEIGHT_UNIT_PREFS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      PROFILE_IDS.forEach((p) => {
+        if (parsed && parsed[p] === "stlb") defaults[p] = "stlb";
+      });
+      return defaults;
+    }
+
+    // Migrate legacy single-unit preference to both profiles.
+    const legacy = localStorage.getItem(WEIGHT_UNIT_KEY);
+    if (legacy === "stlb") {
+      PROFILE_IDS.forEach((p) => { defaults[p] = "stlb"; });
+    }
+    return defaults;
   } catch {
-    return "kg";
+    return defaults;
   }
 }
-function saveWeightUnit(unit) {
+function saveWeightUnitPrefs(prefs) {
   try {
-    localStorage.setItem(WEIGHT_UNIT_KEY, unit);
+    localStorage.setItem(WEIGHT_UNIT_PREFS_KEY, JSON.stringify(prefs));
   } catch {}
+}
+function getProfileWeightUnit(profileId = activeProfile()) {
+  return weightUnitPrefs[profileId] === "stlb" ? "stlb" : "kg";
+}
+function setProfileWeightUnit(profileId, unit) {
+  weightUnitPrefs[profileId] = unit === "stlb" ? "stlb" : "kg";
+  saveWeightUnitPrefs(weightUnitPrefs);
 }
 function toKgFromStLb(st, lb) {
   if (!Number.isFinite(st) || !Number.isFinite(lb)) return null;
@@ -71,7 +93,7 @@ function toStLbFromKg(kg) {
 }
 function formatWeightValue(kg) {
   if (kg == null || !Number.isFinite(kg)) return "—";
-  if (weightUnit === "stlb") {
+  if (getProfileWeightUnit() === "stlb") {
     const parts = toStLbFromKg(kg);
     return `${parts.st} st ${parts.lb.toFixed(2)} lb`;
   }
@@ -139,7 +161,7 @@ let store = loadStore();
 let savedHintTimer = null;
 let supabaseClient = null;
 let currentLogDate = clampLogDate(today());
-let weightUnit = loadWeightUnit();
+let weightUnitPrefs = loadWeightUnitPrefs();
 const activeProfile = () => store.activeProfile;
 
 const $ = (sel) => document.querySelector(sel);
@@ -344,7 +366,7 @@ function updateWeightUnitUI() {
   const stlbRow = $("#weightStLb");
   if (!unitEl || !btn || !kgInput || !stlbRow) return;
 
-  const isStLb = weightUnit === "stlb";
+  const isStLb = getProfileWeightUnit() === "stlb";
   unitEl.textContent = isStLb ? "Weight (st/lb)" : "Weight (kg)";
   btn.textContent = isStLb ? "Use kg" : "Use st/lb";
   kgInput.hidden = isStLb;
@@ -352,7 +374,7 @@ function updateWeightUnitUI() {
 }
 
 function readWeightKgFromForm() {
-  if (weightUnit === "stlb") {
+  if (getProfileWeightUnit() === "stlb") {
     const stStr = $("#weightSt").value.trim();
     const lbStr = $("#weightLb").value.trim();
     if (stStr === "" && lbStr === "") return null;
@@ -422,8 +444,8 @@ function bindLog() {
 
   $("#unitToggleBtn").addEventListener("click", () => {
     const kgDraft = readWeightKgFromForm();
-    weightUnit = weightUnit === "kg" ? "stlb" : "kg";
-    saveWeightUnit(weightUnit);
+    const nextUnit = getProfileWeightUnit() === "kg" ? "stlb" : "kg";
+    setProfileWeightUnit(activeProfile(), nextUnit);
     updateWeightUnitUI();
     writeWeightInputsFromKg(kgDraft);
     updateUnsavedState();
@@ -541,6 +563,7 @@ function exerciseThisWeek(profileId) {
 let weightChart = null;
 
 function renderStats() {
+  const activeUnit = getProfileWeightUnit();
   PROFILE_IDS.forEach((p) => {
     const dates = lastNDates(60);
     const series = dates.map((d) => ({
@@ -557,7 +580,7 @@ function renderStats() {
       valEl.textContent = formatWeightValue(latest.y);
       if (old && old.y != null) {
         const diff = latest.y - old.y;
-        const diffText = weightUnit === "stlb"
+        const diffText = activeUnit === "stlb"
           ? Math.abs(diff / KG_PER_LB).toFixed(2) + " lb"
           : Math.abs(diff).toFixed(2) + " kg";
         subEl.textContent = (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "• ") + diffText + " vs 30d";
@@ -602,7 +625,7 @@ function renderStats() {
 function drawWeightChart() {
   const ctx = document.getElementById("weightChart");
   const dates = lastNDates(60);
-  const useStLb = weightUnit === "stlb";
+  const useStLb = getProfileWeightUnit() === "stlb";
 
   const datasets = [];
   PROFILE_IDS.forEach((p) => {
