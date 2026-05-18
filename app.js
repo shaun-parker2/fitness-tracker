@@ -11,6 +11,14 @@ const PROFILE_META = {
 };
 const PROFILE_IDS = ["shaun", "jemma"];
 
+// Optional cloud sync (Supabase)
+// Fill these and redeploy to enable shared sync across devices.
+const CLOUD_CONFIG = {
+  url: "",
+  anonKey: "",
+  appId: "shaun-jemma-tracker",
+};
+
 // ---------- date helpers ----------
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -70,7 +78,7 @@ function getEntry(profileId, dateStr) {
 }
 function setEntry(profileId, dateStr, patch) {
   const cur = getEntry(profileId, dateStr);
-  const next = { ...cur, ...patch };
+  const next = { ...cur, ...patch, _updatedAt: new Date().toISOString() };
   const hasData =
     next.weight != null ||
     next.steps8k || next.lowUpf || next.exercise ||
@@ -85,10 +93,100 @@ function setEntry(profileId, dateStr, patch) {
 // ---------- app state ----------
 let store = loadStore();
 let savedHintTimer = null;
+let supabaseClient = null;
 const activeProfile = () => store.activeProfile;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
+
+function cloudEnabled() {
+  return !!(CLOUD_CONFIG.url && CLOUD_CONFIG.anonKey && window.supabase && window.supabase.createClient);
+}
+function getSupabase() {
+  if (!cloudEnabled()) return null;
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(CLOUD_CONFIG.url, CLOUD_CONFIG.anonKey);
+  }
+  return supabaseClient;
+}
+function setCloudStatus(msg, cls = "") {
+  const el = $("#cloudStatus");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `cloud-status ${cls}`.trim();
+}
+
+function entryHasData(e) {
+  return !!(
+    e && (
+      e.weight != null ||
+      e.steps8k || e.lowUpf || e.exercise ||
+      (e.beers || 0) > 0 ||
+      (e.note && e.note.trim().length > 0)
+    )
+  );
+}
+
+async function pushEntryToCloud(profileId, dateStr) {
+  const client = getSupabase();
+  if (!client) return;
+  const e = getEntry(profileId, dateStr);
+  if (!entryHasData(e)) {
+    await client
+      .from("tracker_entries")
+      .delete()
+      .eq("app_id", CLOUD_CONFIG.appId)
+      .eq("profile", profileId)
+      .eq("entry_date", dateStr);
+    return;
+  }
+  const payload = {
+    app_id: CLOUD_CONFIG.appId,
+    profile: profileId,
+    entry_date: dateStr,
+    weight: e.weight,
+    steps8k: !!e.steps8k,
+    low_upf: !!e.lowUpf,
+    exercise: !!e.exercise,
+    beers: e.beers || 0,
+    note: e.note || "",
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client
+    .from("tracker_entries")
+    .upsert(payload, { onConflict: "app_id,profile,entry_date" });
+  if (error) throw error;
+}
+
+async function pullCloudToLocal() {
+  const client = getSupabase();
+  if (!client) return;
+  const { data, error } = await client
+    .from("tracker_entries")
+    .select("app_id,profile,entry_date,weight,steps8k,low_upf,exercise,beers,note,updated_at")
+    .eq("app_id", CLOUD_CONFIG.appId)
+    .in("profile", PROFILE_IDS)
+    .order("entry_date", { ascending: true });
+
+  if (error) throw error;
+  if (!Array.isArray(data)) return;
+
+  data.forEach((r) => {
+    if (!PROFILE_IDS.includes(r.profile)) return;
+    const local = getEntries(r.profile)[r.entry_date];
+    if (local && local._updatedAt && r.updated_at && local._updatedAt >= r.updated_at) return;
+    getEntries(r.profile)[r.entry_date] = {
+      weight: r.weight,
+      steps8k: !!r.steps8k,
+      lowUpf: !!r.low_upf,
+      exercise: !!r.exercise,
+      beers: r.beers || 0,
+      note: r.note || "",
+      _updatedAt: r.updated_at || new Date().toISOString(),
+    };
+  });
+  saveStore(store);
+}
 
 // ---------- LOG view ----------
 function renderLog() {
@@ -163,14 +261,43 @@ function bindLog() {
     }, 500);
   });
 
-  $("#submitBtn").addEventListener("click", () => {
+  $("#submitBtn").addEventListener("click", async () => {
     const vStr = $("#weight").value;
     const vNum = vStr === "" ? null : Number(vStr);
+    const profileId = activeProfile();
+    const dateStr = today();
     setEntry(activeProfile(), today(), {
       weight: Number.isFinite(vNum) ? vNum : null,
       note: $("#note").value,
     });
-    flashSaved(`Saved for ${PROFILE_META[activeProfile()].name} ✓`);
+    try {
+      if (cloudEnabled()) {
+        setCloudStatus("Cloud: syncing...");
+        await pushEntryToCloud(profileId, dateStr);
+        setCloudStatus("Cloud: synced", "ok");
+      }
+      flashSaved(`Saved for ${PROFILE_META[profileId].name} ✓`);
+    } catch (err) {
+      setCloudStatus("Cloud: sync failed", "error");
+      flashSaved("Saved locally (cloud failed)");
+      console.error(err);
+    }
+  });
+
+  $("#syncNowBtn").addEventListener("click", async () => {
+    if (!cloudEnabled()) {
+      setCloudStatus("Cloud: local only (configure Supabase)");
+      return;
+    }
+    try {
+      setCloudStatus("Cloud: syncing...");
+      await pullCloudToLocal();
+      renderActiveView();
+      setCloudStatus("Cloud: synced", "ok");
+    } catch (err) {
+      setCloudStatus("Cloud: sync failed", "error");
+      console.error(err);
+    }
   });
 }
 
@@ -535,23 +662,49 @@ function bindTabs() {
 }
 
 // ---------- init ----------
-$$(".profile-btn").forEach((b) => b.classList.toggle("active", b.dataset.profile === activeProfile()));
-bindLog();
-bindTabs();
-bindProfileSwitch();
-bindData();
-renderLog();
+async function initApp() {
+  $$(".profile-btn").forEach((b) => b.classList.toggle("active", b.dataset.profile === activeProfile()));
+  bindLog();
+  bindTabs();
+  bindProfileSwitch();
+  bindData();
+  renderLog();
 
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    store = loadStore();
-    $$(".profile-btn").forEach((b) => b.classList.toggle("active", b.dataset.profile === activeProfile()));
-    renderActiveView();
+  if (cloudEnabled()) {
+    setCloudStatus("Cloud: connecting...");
+    try {
+      await pullCloudToLocal();
+      renderActiveView();
+      setCloudStatus("Cloud: synced", "ok");
+    } catch (err) {
+      setCloudStatus("Cloud: sync failed", "error");
+      console.error(err);
+    }
+  } else {
+    setCloudStatus("Cloud: local only (configure Supabase)");
   }
-});
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+  document.addEventListener("visibilitychange", async () => {
+    if (!document.hidden) {
+      store = loadStore();
+      $$(".profile-btn").forEach((b) => b.classList.toggle("active", b.dataset.profile === activeProfile()));
+      if (cloudEnabled()) {
+        try {
+          await pullCloudToLocal();
+          setCloudStatus("Cloud: synced", "ok");
+        } catch {
+          setCloudStatus("Cloud: sync failed", "error");
+        }
+      }
+      renderActiveView();
+    }
   });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
 }
+
+initApp();

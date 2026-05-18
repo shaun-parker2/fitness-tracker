@@ -1,5 +1,5 @@
 /* Simple offline-first cache for Trend */
-const CACHE = "trend-v2";
+const CACHE = "trend-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./manifest.webmanifest",
   "./icon.svg",
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
 ];
 
 self.addEventListener("install", (e) => {

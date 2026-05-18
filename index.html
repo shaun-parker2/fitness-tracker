@@ -68,6 +68,10 @@
 
       <button id="submitBtn" class="btn btn-submit">Save today</button>
       <div id="savedHint" class="saved-hint">Saved ✓</div>
+      <div class="cloud-row">
+        <span id="cloudStatus" class="cloud-status">Cloud: local only</span>
+        <button id="syncNowBtn" class="btn btn-secondary btn-small" type="button">Sync now</button>
+      </div>
     </section>
 
     <!-- ====================== STATS VIEW ====================== -->
@@ -200,6 +204,7 @@
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>
