@@ -248,6 +248,8 @@ function renderLog() {
     btn.classList.toggle("done", !!e[k]);
     btn.querySelector(".kpi-state").textContent = e[k] ? "Done ✓" : "Tap to mark done";
   });
+
+  setUnsavedState(false);
 }
 
 function setLogDate(dateStr) {
@@ -284,6 +286,12 @@ function flashSaved(msg) {
   }, 1400);
 }
 
+function setUnsavedState(isDirty) {
+  const el = $("#unsavedHint");
+  if (!el) return;
+  el.classList.toggle("show", !!isDirty);
+}
+
 function bindLog() {
   function readLogDraft() {
     const vStr = $("#weight").value;
@@ -301,6 +309,23 @@ function bindLog() {
     return draft;
   }
 
+  function updateUnsavedState() {
+    const profileId = activeProfile();
+    const dateStr = currentLogDate;
+    const saved = getEntry(profileId, dateStr);
+    const draft = readLogDraft();
+
+    const isDirty =
+      (saved.weight ?? null) !== draft.weight ||
+      (saved.note || "") !== draft.note ||
+      KPIS.some((k) => !!saved[k] !== !!draft[k]);
+
+    setUnsavedState(isDirty);
+  }
+
+  $("#weight").addEventListener("input", updateUnsavedState);
+  $("#note").addEventListener("input", updateUnsavedState);
+
   $$(".kpi-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const k = btn.dataset.kpi;
@@ -309,6 +334,7 @@ function bindLog() {
       btn.classList.toggle("done", isDone);
       const state = btn.querySelector(".kpi-state");
       if (state) state.textContent = isDone ? "Done ✓" : "Tap to mark done";
+      updateUnsavedState();
     });
   });
 
@@ -323,6 +349,7 @@ function bindLog() {
     } else {
       flashSaved(`Saved for ${PROFILE_META[profileId].name} ✓`);
     }
+    setUnsavedState(false);
   });
 
   $("#syncNowBtn").addEventListener("click", async () => {
