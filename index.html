@@ -202,12 +202,57 @@
         <button class="btn btn-danger" id="wipeBtn">Wipe all data</button>
       </div>
     </section>
+
+    <!-- ====================== MEALS VIEW ====================== -->
+    <section id="view-meals" class="view hidden">
+      <div class="meals-subtabs" role="tablist" aria-label="Meals section">
+        <button class="meals-subtab active" data-subview="list" type="button">Meals</button>
+        <button class="meals-subtab" data-subview="shopping" type="button">Shopping list</button>
+      </div>
+
+      <div id="meals-subview-list">
+        <div class="card">
+          <label for="newMealInput" class="card-label">Add a meal</label>
+          <div class="inline-row">
+            <input id="newMealInput" type="text" placeholder="e.g. Roast chicken with veg" />
+            <button id="addMealBtn" class="btn btn-small" type="button">Add</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Your meals</div>
+          <div id="mealsList"></div>
+        </div>
+      </div>
+
+      <div id="meals-subview-shopping" class="hidden">
+        <div class="card">
+          <label for="newShopItem" class="card-label">Add item manually</label>
+          <div class="inline-row">
+            <input id="newShopItem" type="text" placeholder="e.g. milk" />
+            <button id="addShopItemBtn" class="btn btn-small" type="button">Add</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="shopping-head">
+            <div class="card-label">Shopping list</div>
+            <div class="shopping-actions">
+              <button id="clearShopCheckedBtn" class="btn btn-secondary btn-small" type="button">Clear checked</button>
+              <button id="clearShopAllBtn" class="btn btn-danger btn-small" type="button">Clear all</button>
+            </div>
+          </div>
+          <div id="shoppingList"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <nav class="tabbar">
     <button class="tab active" data-view="log"><span>📝</span>Log</button>
     <button class="tab" data-view="stats"><span>📊</span>Stats</button>
     <button class="tab" data-view="history"><span>📅</span>History</button>
+    <button class="tab" data-view="meals"><span>🍽️</span>Meals</button>
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

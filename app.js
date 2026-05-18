@@ -137,6 +137,33 @@ function loadStore() {
 }
 function saveStore(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 
+// ---------- meals + shopping storage ----------
+const MEALS_STORAGE_KEY = "trend.meals.v1";
+let mealsCurrentSubview = "list";
+
+function emptyMealsStore() {
+  return { meals: [], shopping: [] };
+}
+function loadMealsStore() {
+  try {
+    const raw = localStorage.getItem(MEALS_STORAGE_KEY);
+    if (!raw) return emptyMealsStore();
+    const obj = JSON.parse(raw);
+    return {
+      meals: Array.isArray(obj.meals) ? obj.meals : [],
+      shopping: Array.isArray(obj.shopping) ? obj.shopping : [],
+    };
+  } catch {
+    return emptyMealsStore();
+  }
+}
+function saveMealsStore() {
+  localStorage.setItem(MEALS_STORAGE_KEY, JSON.stringify(mealsStore));
+}
+function makeId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 function getEntries(profileId) { return store.profiles[profileId].entries; }
 function getEntry(profileId, dateStr) {
   return getEntries(profileId)[dateStr] || {
@@ -158,6 +185,7 @@ function setEntry(profileId, dateStr, patch) {
 
 // ---------- app state ----------
 let store = loadStore();
+let mealsStore = loadMealsStore();
 let savedHintTimer = null;
 let supabaseClient = null;
 let currentLogDate = clampLogDate(today());
@@ -796,6 +824,293 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
+// ---------- MEALS view ----------
+function renderMeals() {
+  const listView = $("#meals-subview-list");
+  const shopView = $("#meals-subview-shopping");
+  if (!listView || !shopView) return;
+
+  $$(".meals-subtab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.subview === mealsCurrentSubview);
+  });
+  listView.classList.toggle("hidden", mealsCurrentSubview !== "list");
+  shopView.classList.toggle("hidden", mealsCurrentSubview !== "shopping");
+
+  if (mealsCurrentSubview === "list") {
+    renderMealsList();
+  } else {
+    renderShoppingList();
+  }
+}
+
+function renderMealsList() {
+  const container = $("#mealsList");
+  if (!container) return;
+  if (!mealsStore.meals.length) {
+    container.innerHTML = `<div class="empty-hint">No meals yet — add one above to get started.</div>`;
+    return;
+  }
+
+  const sorted = [...mealsStore.meals].sort((a, b) => a.name.localeCompare(b.name));
+  container.innerHTML = sorted.map((meal) => {
+    const ingredientsHtml = (meal.ingredients || []).length
+      ? meal.ingredients.map((ing) => `
+          <div class="ingredient-row" data-meal-id="${meal.id}" data-ing-id="${ing.id}">
+            <span class="ing-name">${escapeHtml(ing.name)}</span>
+            <button class="icon-btn" data-action="del-ing" data-meal-id="${meal.id}" data-ing-id="${ing.id}" type="button" aria-label="Remove ingredient">✕</button>
+          </div>`).join("")
+      : `<div class="empty-hint">No ingredients yet.</div>`;
+
+    return `
+      <div class="meal-row" data-meal-id="${meal.id}">
+        <div class="meal-row-head">
+          <div class="meal-name">${escapeHtml(meal.name)}</div>
+          <div class="meal-row-actions">
+            <button class="btn btn-small" data-action="add-to-shop" data-meal-id="${meal.id}" type="button">Add to shop</button>
+            <button class="btn btn-danger btn-small" data-action="del-meal" data-meal-id="${meal.id}" type="button">Delete</button>
+          </div>
+        </div>
+        <div class="meal-ingredients">
+          ${ingredientsHtml}
+          <div class="add-ing-row inline-row">
+            <input type="text" placeholder="Add ingredient" data-meal-id="${meal.id}" data-role="new-ing-input" />
+            <button class="btn btn-small" data-action="add-ing" data-meal-id="${meal.id}" type="button">Add</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderShoppingList() {
+  const container = $("#shoppingList");
+  if (!container) return;
+  if (!mealsStore.shopping.length) {
+    container.innerHTML = `<div class="empty-hint">Shopping list is empty. Add items manually or from a meal.</div>`;
+    return;
+  }
+
+  const groups = new Map();
+  mealsStore.shopping.forEach((item) => {
+    const key = item.mealName || "Manual additions";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+
+  container.innerHTML = Array.from(groups.entries()).map(([groupName, items]) => `
+    <div class="shop-group">
+      <div class="shop-group-label">${escapeHtml(groupName)}</div>
+      ${items.map((item) => `
+        <label class="shop-item ${item.checked ? "done" : ""}">
+          <input type="checkbox" data-action="toggle-shop" data-id="${item.id}" ${item.checked ? "checked" : ""} />
+          <span class="shop-name">${escapeHtml(item.name)}</span>
+          <button class="icon-btn" data-action="del-shop" data-id="${item.id}" type="button" aria-label="Remove item">✕</button>
+        </label>
+      `).join("")}
+    </div>`).join("");
+}
+
+function findMeal(id) {
+  return mealsStore.meals.find((m) => m.id === id);
+}
+function addMeal(name) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  mealsStore.meals.push({ id: makeId(), name: trimmed, ingredients: [] });
+  saveMealsStore();
+  renderMealsList();
+}
+function deleteMeal(id) {
+  if (!confirm("Delete this meal?")) return;
+  mealsStore.meals = mealsStore.meals.filter((m) => m.id !== id);
+  saveMealsStore();
+  renderMealsList();
+}
+function addIngredient(mealId, name) {
+  const meal = findMeal(mealId);
+  const trimmed = name.trim();
+  if (!meal || !trimmed) return;
+  if (!Array.isArray(meal.ingredients)) meal.ingredients = [];
+  meal.ingredients.push({ id: makeId(), name: trimmed });
+  saveMealsStore();
+  renderMealsList();
+}
+function deleteIngredient(mealId, ingId) {
+  const meal = findMeal(mealId);
+  if (!meal) return;
+  meal.ingredients = (meal.ingredients || []).filter((i) => i.id !== ingId);
+  saveMealsStore();
+  renderMealsList();
+}
+
+function addShoppingItem(name, mealName = "") {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  mealsStore.shopping.push({
+    id: makeId(),
+    name: trimmed,
+    mealName: mealName || "",
+    checked: false,
+  });
+  saveMealsStore();
+}
+function toggleShoppingItem(id) {
+  const item = mealsStore.shopping.find((i) => i.id === id);
+  if (!item) return;
+  item.checked = !item.checked;
+  saveMealsStore();
+  renderShoppingList();
+}
+function deleteShoppingItem(id) {
+  mealsStore.shopping = mealsStore.shopping.filter((i) => i.id !== id);
+  saveMealsStore();
+  renderShoppingList();
+}
+function clearCheckedShopping() {
+  mealsStore.shopping = mealsStore.shopping.filter((i) => !i.checked);
+  saveMealsStore();
+  renderShoppingList();
+}
+function clearAllShopping() {
+  if (!confirm("Clear the entire shopping list?")) return;
+  mealsStore.shopping = [];
+  saveMealsStore();
+  renderShoppingList();
+}
+
+function openMealPicker(mealId) {
+  const meal = findMeal(mealId);
+  if (!meal) return;
+  const ingredients = meal.ingredients || [];
+  if (!ingredients.length) {
+    alert("This meal has no ingredients yet.");
+    return;
+  }
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-title">Add to shopping list: ${escapeHtml(meal.name)}</div>
+      <div class="empty-hint">Tick what you need to buy. Untick anything you already have.</div>
+      <div class="meal-ingredients">
+        ${ingredients.map((ing) => `
+          <label class="shop-item">
+            <input type="checkbox" data-ing-id="${ing.id}" checked />
+            <span class="shop-name">${escapeHtml(ing.name)}</span>
+          </label>
+        `).join("")}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" data-action="picker-cancel" type="button">Cancel</button>
+        <button class="btn" data-action="picker-confirm" type="button">Add selected</button>
+      </div>
+    </div>`;
+
+  function close() {
+    backdrop.remove();
+  }
+
+  backdrop.addEventListener("click", (ev) => {
+    if (ev.target === backdrop) close();
+  });
+
+  backdrop.querySelector('[data-action="picker-cancel"]').addEventListener("click", close);
+  backdrop.querySelector('[data-action="picker-confirm"]').addEventListener("click", () => {
+    const checks = backdrop.querySelectorAll('input[type="checkbox"]');
+    checks.forEach((cb) => {
+      if (!cb.checked) return;
+      const ing = ingredients.find((i) => i.id === cb.dataset.ingId);
+      if (ing) addShoppingItem(ing.name, meal.name);
+    });
+    saveMealsStore();
+    close();
+    flashSaved("Added to shopping list ✓");
+    if (mealsCurrentSubview === "shopping") renderShoppingList();
+  });
+
+  document.body.appendChild(backdrop);
+}
+
+function bindMeals() {
+  $$(".meals-subtab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      mealsCurrentSubview = btn.dataset.subview === "shopping" ? "shopping" : "list";
+      renderMeals();
+    });
+  });
+
+  $("#addMealBtn").addEventListener("click", () => {
+    const input = $("#newMealInput");
+    addMeal(input.value);
+    input.value = "";
+    input.focus();
+  });
+  $("#newMealInput").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      $("#addMealBtn").click();
+    }
+  });
+
+  $("#mealsList").addEventListener("click", (ev) => {
+    const target = ev.target.closest("[data-action]");
+    if (!target) return;
+    const action = target.dataset.action;
+    const mealId = target.dataset.mealId;
+    if (action === "del-meal") deleteMeal(mealId);
+    else if (action === "del-ing") deleteIngredient(mealId, target.dataset.ingId);
+    else if (action === "add-ing") {
+      const input = $(`#mealsList input[data-role="new-ing-input"][data-meal-id="${mealId}"]`);
+      if (!input) return;
+      addIngredient(mealId, input.value);
+      input.value = "";
+      input.focus();
+    } else if (action === "add-to-shop") {
+      openMealPicker(mealId);
+    }
+  });
+  $("#mealsList").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    const input = ev.target.closest('input[data-role="new-ing-input"]');
+    if (!input) return;
+    ev.preventDefault();
+    addIngredient(input.dataset.mealId, input.value);
+    input.value = "";
+    input.focus();
+  });
+
+  $("#addShopItemBtn").addEventListener("click", () => {
+    const input = $("#newShopItem");
+    addShoppingItem(input.value);
+    input.value = "";
+    input.focus();
+    renderShoppingList();
+  });
+  $("#newShopItem").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      $("#addShopItemBtn").click();
+    }
+  });
+
+  $("#shoppingList").addEventListener("click", (ev) => {
+    const target = ev.target.closest("[data-action]");
+    if (!target) return;
+    if (target.dataset.action === "del-shop") {
+      ev.preventDefault();
+      deleteShoppingItem(target.dataset.id);
+    }
+  });
+  $("#shoppingList").addEventListener("change", (ev) => {
+    const cb = ev.target.closest('input[data-action="toggle-shop"]');
+    if (!cb) return;
+    toggleShoppingItem(cb.dataset.id);
+  });
+
+  $("#clearShopCheckedBtn").addEventListener("click", clearCheckedShopping);
+  $("#clearShopAllBtn").addEventListener("click", clearAllShopping);
+}
+
 // ---------- Export / Import / Wipe ----------
 function bindData() {
   $("#exportBtn").addEventListener("click", () => {
@@ -855,6 +1170,7 @@ function renderActiveView() {
   if (v === "log") renderLog();
   if (v === "stats") renderStats();
   if (v === "history") renderHistory();
+  if (v === "meals") renderMeals();
 }
 function bindTabs() {
   $$(".tab").forEach((tab) => {
@@ -863,7 +1179,7 @@ function bindTabs() {
       $$(".tab").forEach((t) => t.classList.toggle("active", t === tab));
       $$(".view").forEach((v) => v.classList.add("hidden"));
       $(`#view-${view}`).classList.remove("hidden");
-      const titles = { log: "Log", stats: "Stats", history: "History" };
+      const titles = { log: "Log", stats: "Stats", history: "History", meals: "Meals" };
       $("#topTitle").textContent = titles[view];
       renderActiveView();
     });
@@ -878,6 +1194,7 @@ async function initApp() {
   bindTabs();
   bindProfileSwitch();
   bindData();
+  bindMeals();
   renderLog();
 
   if (cloudEnabled()) {
