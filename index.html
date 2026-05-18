@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1115" />
+  <title>Trend</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="topTitle">Today</h1>
+    <span id="todayDate" class="muted"></span>
+  </header>
+
+  <main>
+    <!-- ====================== LOG VIEW ====================== -->
+    <section id="view-log" class="view">
+      <div class="card">
+        <label for="weight" class="card-label">Weight (kg)</label>
+        <input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 92.4" />
+      </div>
+
+      <div class="kpi-grid">
+        <button class="kpi-btn" data-kpi="steps8k">
+          <div class="kpi-icon">👟</div>
+          <div class="kpi-title">Steps ≥ 8,000</div>
+          <div class="kpi-state">Tap to mark done</div>
+        </button>
+        <button class="kpi-btn" data-kpi="lowUpf">
+          <div class="kpi-icon">🥩</div>
+          <div class="kpi-title">Low UPF day</div>
+          <div class="kpi-state">Tap to mark done</div>
+        </button>
+        <button class="kpi-btn" data-kpi="exercise">
+          <div class="kpi-icon">🏋️</div>
+          <div class="kpi-title">Exercise (run / weights)</div>
+          <div class="kpi-state">Tap to mark done</div>
+        </button>
+      </div>
+
+      <div class="card">
+        <label class="card-label">Beers</label>
+        <div class="stepper">
+          <button class="step-btn" data-step="-1">−</button>
+          <span id="beersVal">0</span>
+          <button class="step-btn" data-step="1">+</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="note" class="card-label">Note (optional)</label>
+        <textarea id="note" rows="3" placeholder="How did today go? What did you eat?"></textarea>
+      </div>
+
+      <div id="savedHint" class="saved-hint">Saved automatically ✓</div>
+    </section>
+
+    <!-- ====================== STATS VIEW ====================== -->
+    <section id="view-stats" class="view hidden">
+      <div class="summary-row">
+        <div class="summary-tile">
+          <div class="summary-label">Weight (7d avg)</div>
+          <div class="summary-value" id="sWeight">—</div>
+          <div class="summary-sub" id="sWeightTrend">—</div>
+        </div>
+        <div class="summary-tile">
+          <div class="summary-label">Exercise this wk</div>
+          <div class="summary-value" id="sExercise">0 / 5</div>
+          <div class="summary-sub muted">Mon–Sun</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Weight</div>
+        <canvas id="weightChart" height="180"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Last 30 days — KPI completion</div>
+        <div class="kpi-pct-row">
+          <div class="kpi-pct"><div class="kpi-pct-label">Steps</div><div class="kpi-pct-val" id="pctSteps">—</div></div>
+          <div class="kpi-pct"><div class="kpi-pct-label">Low UPF</div><div class="kpi-pct-val" id="pctUpf">—</div></div>
+          <div class="kpi-pct"><div class="kpi-pct-label">Exercise</div><div class="kpi-pct-val" id="pctEx">—</div></div>
+        </div>
+        <canvas id="kpiChart" height="180"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Streaks (current)</div>
+        <div class="streak-row">
+          <div class="streak"><div class="streak-num" id="stkSteps">0</div><div class="streak-lbl">Steps</div></div>
+          <div class="streak"><div class="streak-num" id="stkUpf">0</div><div class="streak-lbl">Low UPF</div></div>
+          <div class="streak"><div class="streak-num" id="stkEx">0</div><div class="streak-lbl">Exercise</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Beers — last 30 days</div>
+        <div class="summary-value" id="beersTotal">0</div>
+        <div class="summary-sub muted" id="beersAvg">0.0 / week avg</div>
+      </div>
+    </section>
+
+    <!-- ====================== HISTORY VIEW ====================== -->
+    <section id="view-history" class="view hidden">
+      <div class="card">
+        <div class="card-label">All entries</div>
+        <div id="historyList"></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Data</div>
+        <div class="btn-row">
+          <button class="btn" id="exportBtn">Export JSON</button>
+          <label class="btn btn-secondary">
+            Import JSON
+            <input type="file" id="importInput" accept="application/json" hidden />
+          </label>
+        </div>
+        <button class="btn btn-danger" id="wipeBtn">Wipe all data</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-view="log"><span>📝</span>Log</button>
+    <button class="tab" data-view="stats"><span>📊</span>Stats</button>
+    <button class="tab" data-view="history"><span>📅</span>History</button>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
