@@ -1,5 +1,5 @@
 /* Simple offline-first cache for Trend */
-const CACHE = "trend-v4";
+const CACHE = "trend-v5";
 const ASSETS = [
   "./",
   "./index.html",

@@ -1,6 +1,6 @@
 {
-  "name": "Trend — fitness tracker",
-  "short_name": "Trend",
+  "name": "S&J Fit",
+  "short_name": "S&J Fit",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
