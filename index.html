@@ -45,8 +45,15 @@
       </div>
 
       <div class="card">
-        <label for="weight" class="card-label">Weight (kg) — <span id="logWho">Shaun</span></label>
-        <input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 92.4" />
+        <div class="weight-head">
+          <label for="weightKg" class="card-label"><span id="weightUnitLabel">Weight (kg)</span> — <span id="logWho">Shaun</span></label>
+          <button id="unitToggleBtn" class="btn btn-secondary btn-small" type="button">Use st/lb</button>
+        </div>
+        <input id="weightKg" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 92.4" />
+        <div id="weightStLb" class="stlb-row" hidden>
+          <input id="weightSt" type="number" inputmode="numeric" step="1" min="0" placeholder="st" />
+          <input id="weightLb" type="number" inputmode="decimal" step="0.01" min="0" placeholder="lb (0.00-13.99)" />
+        </div>
       </div>
 
       <div class="kpi-grid">

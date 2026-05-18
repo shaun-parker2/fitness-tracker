@@ -99,6 +99,20 @@ main { padding: 14px; max-width: 720px; margin: 0 auto; }
   display: block;
 }
 
+.weight-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.weight-head .card-label { margin-bottom: 0; }
+.stlb-row {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 input[type=number], input[type=date], textarea {
   width: 100%;
   background: var(--bg-elev-2);

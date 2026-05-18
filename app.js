@@ -4,6 +4,7 @@
    ============================================================ */
 
 const STORAGE_KEY = "trend.v1"; // same key; in-place migrate v1 -> v2
+const WEIGHT_UNIT_KEY = "trend.weightUnit.v1";
 const KPIS = ["steps8k", "lowUpf", "exercise", "noBooze"];
 const PROFILE_META = {
   shaun: { name: "Shaun", color: "#4ade80" },
@@ -34,6 +35,48 @@ const fmtNice = (s) => {
 };
 const isFutureDate = (s) => s > today();
 const clampLogDate = (s) => (!s || isFutureDate(s) ? today() : s);
+const KG_PER_LB = 0.45359237;
+const LB_PER_ST = 14;
+
+function loadWeightUnit() {
+  try {
+    const v = localStorage.getItem(WEIGHT_UNIT_KEY);
+    return v === "stlb" ? "stlb" : "kg";
+  } catch {
+    return "kg";
+  }
+}
+function saveWeightUnit(unit) {
+  try {
+    localStorage.setItem(WEIGHT_UNIT_KEY, unit);
+  } catch {}
+}
+function toKgFromStLb(st, lb) {
+  if (!Number.isFinite(st) || !Number.isFinite(lb)) return null;
+  if (st < 0 || lb < 0) return null;
+  const totalLb = st * LB_PER_ST + lb;
+  return Math.round(totalLb * KG_PER_LB * 1000) / 1000;
+}
+function toStLbFromKg(kg) {
+  if (!Number.isFinite(kg) || kg <= 0) return { st: 0, lb: 0 };
+  const totalLb = kg / KG_PER_LB;
+  let st = Math.floor(totalLb / LB_PER_ST);
+  let lb = totalLb - st * LB_PER_ST;
+  lb = Math.round(lb * 100) / 100;
+  if (lb >= LB_PER_ST) {
+    st += 1;
+    lb = 0;
+  }
+  return { st, lb };
+}
+function formatWeightValue(kg) {
+  if (kg == null || !Number.isFinite(kg)) return "—";
+  if (weightUnit === "stlb") {
+    const parts = toStLbFromKg(kg);
+    return `${parts.st} st ${parts.lb.toFixed(2)} lb`;
+  }
+  return `${kg.toFixed(1)} kg`;
+}
 
 // ---------- storage with v1 -> v2 migration ----------
 function emptyStore() {
@@ -96,6 +139,7 @@ let store = loadStore();
 let savedHintTimer = null;
 let supabaseClient = null;
 let currentLogDate = clampLogDate(today());
+let weightUnit = loadWeightUnit();
 const activeProfile = () => store.activeProfile;
 
 const $ = (sel) => document.querySelector(sel);
@@ -238,7 +282,8 @@ function renderLog() {
   $("#nextDayBtn").disabled = t === today();
   $("#todayBtn").disabled = t === today();
   $("#logWho").textContent = PROFILE_META[p].name;
-  $("#weight").value = e.weight ?? "";
+  updateWeightUnitUI();
+  writeWeightInputsFromKg(e.weight);
   $("#note").value = e.note || "";
   $("#submitBtn").textContent = t === today() ? "Save today" : `Save ${fmtNice(t)}`;
 
@@ -292,12 +337,59 @@ function setUnsavedState(isDirty) {
   el.classList.toggle("show", !!isDirty);
 }
 
+function updateWeightUnitUI() {
+  const unitEl = $("#weightUnitLabel");
+  const btn = $("#unitToggleBtn");
+  const kgInput = $("#weightKg");
+  const stlbRow = $("#weightStLb");
+  if (!unitEl || !btn || !kgInput || !stlbRow) return;
+
+  const isStLb = weightUnit === "stlb";
+  unitEl.textContent = isStLb ? "Weight (st/lb)" : "Weight (kg)";
+  btn.textContent = isStLb ? "Use kg" : "Use st/lb";
+  kgInput.hidden = isStLb;
+  stlbRow.hidden = !isStLb;
+}
+
+function readWeightKgFromForm() {
+  if (weightUnit === "stlb") {
+    const stStr = $("#weightSt").value.trim();
+    const lbStr = $("#weightLb").value.trim();
+    if (stStr === "" && lbStr === "") return null;
+    const st = stStr === "" ? 0 : Number(stStr);
+    const lb = lbStr === "" ? 0 : Number(lbStr);
+    const kg = toKgFromStLb(st, lb);
+    return Number.isFinite(kg) ? kg : null;
+  }
+  const vStr = $("#weightKg").value.trim();
+  if (vStr === "") return null;
+  const vNum = Number(vStr);
+  return Number.isFinite(vNum) ? vNum : null;
+}
+
+function writeWeightInputsFromKg(kg) {
+  const kgInput = $("#weightKg");
+  const stInput = $("#weightSt");
+  const lbInput = $("#weightLb");
+  if (!kgInput || !stInput || !lbInput) return;
+
+  if (kg == null || !Number.isFinite(kg)) {
+    kgInput.value = "";
+    stInput.value = "";
+    lbInput.value = "";
+    return;
+  }
+
+  kgInput.value = String(Math.round(kg * 10) / 10);
+  const parts = toStLbFromKg(kg);
+  stInput.value = String(parts.st);
+  lbInput.value = parts.lb.toFixed(2);
+}
+
 function bindLog() {
   function readLogDraft() {
-    const vStr = $("#weight").value;
-    const vNum = vStr === "" ? null : Number(vStr);
     const draft = {
-      weight: Number.isFinite(vNum) ? vNum : null,
+      weight: readWeightKgFromForm(),
       note: $("#note").value,
     };
 
@@ -323,8 +415,19 @@ function bindLog() {
     setUnsavedState(isDirty);
   }
 
-  $("#weight").addEventListener("input", updateUnsavedState);
+  $("#weightKg").addEventListener("input", updateUnsavedState);
+  $("#weightSt").addEventListener("input", updateUnsavedState);
+  $("#weightLb").addEventListener("input", updateUnsavedState);
   $("#note").addEventListener("input", updateUnsavedState);
+
+  $("#unitToggleBtn").addEventListener("click", () => {
+    const kgDraft = readWeightKgFromForm();
+    weightUnit = weightUnit === "kg" ? "stlb" : "kg";
+    saveWeightUnit(weightUnit);
+    updateWeightUnitUI();
+    writeWeightInputsFromKg(kgDraft);
+    updateUnsavedState();
+  });
 
   $$(".kpi-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -451,10 +554,13 @@ function renderStats() {
     const valEl = p === "shaun" ? $("#sWeightShaun") : $("#sWeightJemma");
     const subEl = p === "shaun" ? $("#sTrendShaun") : $("#sTrendJemma");
     if (latest && latest.y != null) {
-      valEl.textContent = latest.y.toFixed(1) + " kg";
+      valEl.textContent = formatWeightValue(latest.y);
       if (old && old.y != null) {
         const diff = latest.y - old.y;
-        subEl.textContent = (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "• ") + Math.abs(diff).toFixed(2) + " kg vs 30d";
+        const diffText = weightUnit === "stlb"
+          ? Math.abs(diff / KG_PER_LB).toFixed(2) + " lb"
+          : Math.abs(diff).toFixed(2) + " kg";
+        subEl.textContent = (diff > 0 ? "▲ " : diff < 0 ? "▼ " : "• ") + diffText + " vs 30d";
         subEl.className = "summary-sub " + (diff > 0 ? "up" : diff < 0 ? "down" : "");
       } else {
         subEl.textContent = "—";
@@ -496,6 +602,7 @@ function renderStats() {
 function drawWeightChart() {
   const ctx = document.getElementById("weightChart");
   const dates = lastNDates(60);
+  const useStLb = weightUnit === "stlb";
 
   const datasets = [];
   PROFILE_IDS.forEach((p) => {
@@ -538,7 +645,17 @@ function drawWeightChart() {
       animation: false,
       plugins: {
         legend: { labels: { color: "#e7e9ee", boxWidth: 12, font: { size: 11 } } },
-        tooltip: { mode: "index", intersect: false },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          callbacks: {
+            label: function (context) {
+              const y = context.parsed.y;
+              if (y == null || !Number.isFinite(y)) return `${context.dataset.label}: —`;
+              return `${context.dataset.label}: ${formatWeightValue(y)}`;
+            },
+          },
+        },
       },
       scales: {
         x: {
@@ -554,7 +671,24 @@ function drawWeightChart() {
           },
           grid: { color: "#262a34" },
         },
-        y: { ticks: { color: "#8a92a3" }, grid: { color: "#262a34" } },
+        y: {
+          ticks: {
+            color: "#8a92a3",
+            callback: function (val) {
+              const n = Number(val);
+              if (!Number.isFinite(n)) return "";
+              if (!useStLb) return n.toFixed(1);
+              const parts = toStLbFromKg(n);
+              return `${parts.st}st ${parts.lb.toFixed(1)}lb`;
+            },
+          },
+          grid: { color: "#262a34" },
+          title: {
+            display: true,
+            text: useStLb ? "Weight (st/lb)" : "Weight (kg)",
+            color: "#8a92a3",
+          },
+        },
       },
     },
   });
@@ -624,7 +758,7 @@ function renderHistory() {
       (e.lowUpf ? "🟢" : "⚪") +
       (e.exercise ? "🟢" : "⚪") +
       (e.noBooze ? "🟢" : "⚪");
-    const w = e.weight != null ? e.weight.toFixed(1) + " kg" : "—";
+    const w = formatWeightValue(e.weight);
     return `<div class="history-row">
       <div>
         <div class="history-date">${fmtNice(k)}</div>
