@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f1115" />
-  <title>Trend</title>
+  <title>Shaun &amp; Jemma's Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
@@ -12,15 +12,25 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 id="topTitle">Today</h1>
-    <span id="todayDate" class="muted"></span>
+    <div class="topbar-row">
+      <h1 id="topTitle">Today</h1>
+      <span id="todayDate" class="muted"></span>
+    </div>
+    <div class="profile-switch" role="tablist" aria-label="Profile">
+      <button class="profile-btn active" data-profile="shaun" role="tab">
+        <span class="profile-dot" style="background:#4ade80"></span>Shaun
+      </button>
+      <button class="profile-btn" data-profile="jemma" role="tab">
+        <span class="profile-dot" style="background:#f472b6"></span>Jemma
+      </button>
+    </div>
   </header>
 
   <main>
     <!-- ====================== LOG VIEW ====================== -->
     <section id="view-log" class="view">
       <div class="card">
-        <label for="weight" class="card-label">Weight (kg)</label>
+        <label for="weight" class="card-label">Weight (kg) — <span id="logWho">Shaun</span></label>
         <input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 92.4" />
       </div>
 
@@ -56,59 +66,117 @@
         <textarea id="note" rows="3" placeholder="How did today go? What did you eat?"></textarea>
       </div>
 
-      <div id="savedHint" class="saved-hint">Saved automatically ✓</div>
+      <button id="submitBtn" class="btn btn-submit">Save today</button>
+      <div id="savedHint" class="saved-hint">Saved ✓</div>
     </section>
 
     <!-- ====================== STATS VIEW ====================== -->
     <section id="view-stats" class="view hidden">
       <div class="summary-row">
         <div class="summary-tile">
-          <div class="summary-label">Weight (7d avg)</div>
-          <div class="summary-value" id="sWeight">—</div>
-          <div class="summary-sub" id="sWeightTrend">—</div>
+          <div class="summary-label">Shaun · 7d avg</div>
+          <div class="summary-value" id="sWeightShaun">—</div>
+          <div class="summary-sub" id="sTrendShaun">—</div>
         </div>
         <div class="summary-tile">
-          <div class="summary-label">Exercise this wk</div>
-          <div class="summary-value" id="sExercise">0 / 5</div>
-          <div class="summary-sub muted">Mon–Sun</div>
+          <div class="summary-label">Jemma · 7d avg</div>
+          <div class="summary-value" id="sWeightJemma">—</div>
+          <div class="summary-sub" id="sTrendJemma">—</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-label">Weight</div>
-        <canvas id="weightChart" height="180"></canvas>
+        <div class="card-label">Weight — both</div>
+        <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Exercise this week (target 5)</div>
+        <div class="versus">
+          <div class="versus-side">
+            <div class="versus-name"><span class="profile-dot" style="background:#4ade80"></span>Shaun</div>
+            <div class="versus-num" id="exShaun">0 / 5</div>
+          </div>
+          <div class="versus-side">
+            <div class="versus-name"><span class="profile-dot" style="background:#f472b6"></span>Jemma</div>
+            <div class="versus-num" id="exJemma">0 / 5</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Daily traffic lights — last 21 days</div>
+        <div id="tlContainer"></div>
+        <div class="tl-legend">
+          <span><span class="tl-cell tl-green"></span> Done</span>
+          <span><span class="tl-cell tl-red"></span> Missed</span>
+          <span><span class="tl-cell tl-empty"></span> Not logged</span>
+        </div>
       </div>
 
       <div class="card">
         <div class="card-label">Last 30 days — KPI completion</div>
-        <div class="kpi-pct-row">
-          <div class="kpi-pct"><div class="kpi-pct-label">Steps</div><div class="kpi-pct-val" id="pctSteps">—</div></div>
-          <div class="kpi-pct"><div class="kpi-pct-label">Low UPF</div><div class="kpi-pct-val" id="pctUpf">—</div></div>
-          <div class="kpi-pct"><div class="kpi-pct-label">Exercise</div><div class="kpi-pct-val" id="pctEx">—</div></div>
-        </div>
-        <canvas id="kpiChart" height="180"></canvas>
+        <table class="compare-table">
+          <thead><tr><th></th><th>Steps</th><th>Low UPF</th><th>Exercise</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="profile-dot" style="background:#4ade80"></span>Shaun</td>
+              <td id="pctShaunSteps">—</td>
+              <td id="pctShaunUpf">—</td>
+              <td id="pctShaunEx">—</td>
+            </tr>
+            <tr>
+              <td><span class="profile-dot" style="background:#f472b6"></span>Jemma</td>
+              <td id="pctJemmaSteps">—</td>
+              <td id="pctJemmaUpf">—</td>
+              <td id="pctJemmaEx">—</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="card">
-        <div class="card-label">Streaks (current)</div>
-        <div class="streak-row">
-          <div class="streak"><div class="streak-num" id="stkSteps">0</div><div class="streak-lbl">Steps</div></div>
-          <div class="streak"><div class="streak-num" id="stkUpf">0</div><div class="streak-lbl">Low UPF</div></div>
-          <div class="streak"><div class="streak-num" id="stkEx">0</div><div class="streak-lbl">Exercise</div></div>
-        </div>
+        <div class="card-label">Current streaks (days)</div>
+        <table class="compare-table">
+          <thead><tr><th></th><th>Steps</th><th>Low UPF</th><th>Exercise</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="profile-dot" style="background:#4ade80"></span>Shaun</td>
+              <td id="stkShaunSteps">0</td>
+              <td id="stkShaunUpf">0</td>
+              <td id="stkShaunEx">0</td>
+            </tr>
+            <tr>
+              <td><span class="profile-dot" style="background:#f472b6"></span>Jemma</td>
+              <td id="stkJemmaSteps">0</td>
+              <td id="stkJemmaUpf">0</td>
+              <td id="stkJemmaEx">0</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="card">
         <div class="card-label">Beers — last 30 days</div>
-        <div class="summary-value" id="beersTotal">0</div>
-        <div class="summary-sub muted" id="beersAvg">0.0 / week avg</div>
+        <div class="versus">
+          <div class="versus-side">
+            <div class="versus-name"><span class="profile-dot" style="background:#4ade80"></span>Shaun</div>
+            <div class="versus-num" id="beersShaun">0</div>
+            <div class="summary-sub muted" id="beersShaunAvg">0.0 / wk</div>
+          </div>
+          <div class="versus-side">
+            <div class="versus-name"><span class="profile-dot" style="background:#f472b6"></span>Jemma</div>
+            <div class="versus-num" id="beersJemma">0</div>
+            <div class="summary-sub muted" id="beersJemmaAvg">0.0 / wk</div>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- ====================== HISTORY VIEW ====================== -->
     <section id="view-history" class="view hidden">
       <div class="card">
-        <div class="card-label">All entries</div>
+        <div class="card-label">Entries — <span id="historyWho">Shaun</span></div>
         <div id="historyList"></div>
       </div>
       <div class="card">
