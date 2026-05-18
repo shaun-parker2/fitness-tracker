@@ -285,54 +285,38 @@ function flashSaved(msg) {
 }
 
 function bindLog() {
-  let weightTimer = null;
-  $("#weight").addEventListener("input", (ev) => {
-    clearTimeout(weightTimer);
-    weightTimer = setTimeout(() => {
-      const v = ev.target.value;
-      const num = v === "" ? null : Number(v);
-      const profileId = activeProfile();
-      const dateStr = currentLogDate;
-      setEntry(profileId, dateStr, { weight: Number.isFinite(num) ? num : null });
-      syncEntry(profileId, dateStr, { silent: true });
-      flashSaved();
-    }, 400);
-  });
+  function readLogDraft() {
+    const vStr = $("#weight").value;
+    const vNum = vStr === "" ? null : Number(vStr);
+    const draft = {
+      weight: Number.isFinite(vNum) ? vNum : null,
+      note: $("#note").value,
+    };
+
+    KPIS.forEach((k) => {
+      const btn = document.querySelector(`.kpi-btn[data-kpi="${k}"]`);
+      draft[k] = !!(btn && btn.classList.contains("done"));
+    });
+
+    return draft;
+  }
 
   $$(".kpi-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const k = btn.dataset.kpi;
-      const profileId = activeProfile();
-      const dateStr = currentLogDate;
-      const e = getEntry(profileId, dateStr);
-      setEntry(profileId, dateStr, { [k]: !e[k] });
-      renderLog();
-      syncEntry(profileId, dateStr, { silent: true });
-      flashSaved();
+      if (!k) return;
+      const isDone = !btn.classList.contains("done");
+      btn.classList.toggle("done", isDone);
+      const state = btn.querySelector(".kpi-state");
+      if (state) state.textContent = isDone ? "Done ✓" : "Tap to mark done";
     });
-  });
-
-  let noteTimer = null;
-  $("#note").addEventListener("input", (ev) => {
-    clearTimeout(noteTimer);
-    noteTimer = setTimeout(() => {
-      const profileId = activeProfile();
-      const dateStr = currentLogDate;
-      setEntry(profileId, dateStr, { note: ev.target.value });
-      syncEntry(profileId, dateStr, { silent: true });
-      flashSaved();
-    }, 500);
   });
 
   $("#submitBtn").addEventListener("click", async () => {
-    const vStr = $("#weight").value;
-    const vNum = vStr === "" ? null : Number(vStr);
+    const draft = readLogDraft();
     const profileId = activeProfile();
     const dateStr = currentLogDate;
-    setEntry(profileId, dateStr, {
-      weight: Number.isFinite(vNum) ? vNum : null,
-      note: $("#note").value,
-    });
+    setEntry(profileId, dateStr, draft);
     const synced = await syncEntry(profileId, dateStr);
     if (synced === false) {
       flashSaved("Saved locally (cloud failed)");
