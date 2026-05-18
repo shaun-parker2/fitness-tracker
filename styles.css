@@ -6,7 +6,7 @@
   --muted: #8a92a3;
   --accent: #4ade80;       /* Shaun */
   --accent-2: #f472b6;     /* Jemma */
-  --accent-dim: #16331f;
+  --accent-dim: #1f5a32;
   --warn: #facc15;
   --bad: #ef4444;
   --border: #262a34;
@@ -160,8 +160,13 @@ textarea { resize: vertical; }
 .kpi-icon { grid-row: 1 / 3; font-size: 26px; align-self: center; }
 .kpi-title { font-size: 16px; font-weight: 600; }
 .kpi-state { font-size: 13px; color: var(--muted); }
-.kpi-btn.done { background: var(--accent-dim); border-color: var(--accent); }
-.kpi-btn.done .kpi-state { color: var(--accent); font-weight: 600; }
+.kpi-btn.done {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.kpi-btn.done .kpi-title { color: #ffffff; }
+.kpi-btn.done .kpi-state { color: var(--accent); font-weight: 700; }
 
 .btn-submit {
   width: 100%;
@@ -259,7 +264,7 @@ textarea { resize: vertical; }
 }
 .tl-grid {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 86px 1fr;
   gap: 4px 8px;
   align-items: center;
 }

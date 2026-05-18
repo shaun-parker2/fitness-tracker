@@ -231,6 +231,7 @@ function renderLog() {
   const e = getEntry(p, t);
 
   $("#todayDate").textContent = t === today() ? `Today · ${fmtNice(t)}` : `Editing · ${fmtNice(t)}`;
+  $("#topTitle").textContent = t === today() ? "Today" : "Backfill";
   $("#logDate").value = t;
   $("#logDate").max = today();
   $("#logDateLabel").textContent = t === today() ? "Live day" : `Backfill for ${fmtNice(t)}`;
@@ -743,7 +744,19 @@ async function initApp() {
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch(() => {});
+      navigator.serviceWorker.register("sw.js").then((reg) => {
+        if (!reg) return;
+        reg.addEventListener("updatefound", () => {
+          const next = reg.installing;
+          if (!next) return;
+          next.addEventListener("statechange", () => {
+            if (next.state === "installed" && navigator.serviceWorker.controller) {
+              // New build is ready — swap it in on next load.
+              window.location.reload();
+            }
+          });
+        });
+      }).catch(() => {});
     });
   }
 }
