@@ -14,8 +14,8 @@ const PROFILE_IDS = ["shaun", "jemma"];
 // Optional cloud sync (Supabase)
 // Fill these and redeploy to enable shared sync across devices.
 const CLOUD_CONFIG = {
-  url: "",
-  anonKey: "",
+  url: "https://kfntsfawkyrwblwibytv.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbnRzZmF3a3lyd2Jsd2lieXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTE2NDEsImV4cCI6MjA5NDY2NzY0MX0.y0iw2YDCP4_5X0Rb_NbJgEcxpYKCKKDyEcyL0rGFJao",
   appId: "shaun-jemma-tracker",
 };
 
