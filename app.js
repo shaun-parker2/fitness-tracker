@@ -32,6 +32,8 @@ const fmtNice = (s) => {
   const d = parseYmd(s);
   return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 };
+const isFutureDate = (s) => s > today();
+const clampLogDate = (s) => (!s || isFutureDate(s) ? today() : s);
 
 // ---------- storage with v1 -> v2 migration ----------
 function emptyStore() {
@@ -94,6 +96,7 @@ function setEntry(profileId, dateStr, patch) {
 let store = loadStore();
 let savedHintTimer = null;
 let supabaseClient = null;
+let currentLogDate = clampLogDate(today());
 const activeProfile = () => store.activeProfile;
 
 const $ = (sel) => document.querySelector(sel);
@@ -114,6 +117,12 @@ function setCloudStatus(msg, cls = "") {
   if (!el) return;
   el.textContent = msg;
   el.className = `cloud-status ${cls}`.trim();
+}
+function syncStampLabel() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+function markCloudSynced() {
+  setCloudStatus(`Cloud: synced ${syncStampLabel()}`, "ok");
 }
 
 function entryHasData(e) {
@@ -188,23 +197,80 @@ async function pullCloudToLocal() {
   saveStore(store);
 }
 
+async function syncEntry(profileId, dateStr, { silent = false } = {}) {
+  if (!cloudEnabled()) return;
+  try {
+    if (!silent) setCloudStatus("Cloud: syncing...");
+    await pushEntryToCloud(profileId, dateStr);
+    markCloudSynced();
+    return true;
+  } catch (err) {
+    setCloudStatus("Cloud: sync failed", "error");
+    if (!silent) flashSaved("Saved locally (cloud failed)");
+    console.error(err);
+    return false;
+  }
+}
+
+async function syncFromCloud({ silent = false } = {}) {
+  if (!cloudEnabled()) return;
+  try {
+    if (!silent) setCloudStatus("Cloud: syncing...");
+    await pullCloudToLocal();
+    renderActiveView();
+    markCloudSynced();
+  } catch (err) {
+    setCloudStatus("Cloud: sync failed", "error");
+    console.error(err);
+  }
+}
+
 // ---------- LOG view ----------
 function renderLog() {
-  const t = today();
+  const t = currentLogDate;
   const p = activeProfile();
   const e = getEntry(p, t);
 
-  $("#todayDate").textContent = fmtNice(t);
+  $("#todayDate").textContent = t === today() ? `Today · ${fmtNice(t)}` : `Editing · ${fmtNice(t)}`;
+  $("#logDate").value = t;
+  $("#logDate").max = today();
+  $("#logDateLabel").textContent = t === today() ? "Live day" : `Backfill for ${fmtNice(t)}`;
+  $("#nextDayBtn").disabled = t === today();
+  $("#todayBtn").disabled = t === today();
   $("#logWho").textContent = PROFILE_META[p].name;
   $("#weight").value = e.weight ?? "";
   $("#beersVal").textContent = e.beers || 0;
   $("#note").value = e.note || "";
+  $("#submitBtn").textContent = t === today() ? "Save today" : `Save ${fmtNice(t)}`;
 
   KPIS.forEach((k) => {
     const btn = document.querySelector(`.kpi-btn[data-kpi="${k}"]`);
     if (!btn) return;
     btn.classList.toggle("done", !!e[k]);
     btn.querySelector(".kpi-state").textContent = e[k] ? "Done ✓" : "Tap to mark done";
+  });
+}
+
+function setLogDate(dateStr) {
+  currentLogDate = clampLogDate(dateStr);
+  renderLog();
+}
+
+function bindLogDateControls() {
+  $("#logDate").addEventListener("change", (ev) => {
+    setLogDate(ev.target.value || today());
+  });
+
+  $("#prevDayBtn").addEventListener("click", () => {
+    setLogDate(ymd(addDays(parseYmd(currentLogDate), -1)));
+  });
+
+  $("#nextDayBtn").addEventListener("click", () => {
+    setLogDate(ymd(addDays(parseYmd(currentLogDate), 1)));
+  });
+
+  $("#todayBtn").addEventListener("click", () => {
+    setLogDate(today());
   });
 }
 
@@ -226,7 +292,10 @@ function bindLog() {
     weightTimer = setTimeout(() => {
       const v = ev.target.value;
       const num = v === "" ? null : Number(v);
-      setEntry(activeProfile(), today(), { weight: Number.isFinite(num) ? num : null });
+      const profileId = activeProfile();
+      const dateStr = currentLogDate;
+      setEntry(profileId, dateStr, { weight: Number.isFinite(num) ? num : null });
+      syncEntry(profileId, dateStr, { silent: true });
       flashSaved();
     }, 400);
   });
@@ -234,9 +303,12 @@ function bindLog() {
   $$(".kpi-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const k = btn.dataset.kpi;
-      const e = getEntry(activeProfile(), today());
-      setEntry(activeProfile(), today(), { [k]: !e[k] });
+      const profileId = activeProfile();
+      const dateStr = currentLogDate;
+      const e = getEntry(profileId, dateStr);
+      setEntry(profileId, dateStr, { [k]: !e[k] });
       renderLog();
+      syncEntry(profileId, dateStr, { silent: true });
       flashSaved();
     });
   });
@@ -244,10 +316,13 @@ function bindLog() {
   $$(".step-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const delta = Number(btn.dataset.step);
-      const e = getEntry(activeProfile(), today());
+      const profileId = activeProfile();
+      const dateStr = currentLogDate;
+      const e = getEntry(profileId, dateStr);
       const next = Math.max(0, (e.beers || 0) + delta);
-      setEntry(activeProfile(), today(), { beers: next });
+      setEntry(profileId, dateStr, { beers: next });
       $("#beersVal").textContent = next;
+      syncEntry(profileId, dateStr, { silent: true });
       flashSaved();
     });
   });
@@ -256,7 +331,10 @@ function bindLog() {
   $("#note").addEventListener("input", (ev) => {
     clearTimeout(noteTimer);
     noteTimer = setTimeout(() => {
-      setEntry(activeProfile(), today(), { note: ev.target.value });
+      const profileId = activeProfile();
+      const dateStr = currentLogDate;
+      setEntry(profileId, dateStr, { note: ev.target.value });
+      syncEntry(profileId, dateStr, { silent: true });
       flashSaved();
     }, 500);
   });
@@ -265,22 +343,16 @@ function bindLog() {
     const vStr = $("#weight").value;
     const vNum = vStr === "" ? null : Number(vStr);
     const profileId = activeProfile();
-    const dateStr = today();
-    setEntry(activeProfile(), today(), {
+    const dateStr = currentLogDate;
+    setEntry(profileId, dateStr, {
       weight: Number.isFinite(vNum) ? vNum : null,
       note: $("#note").value,
     });
-    try {
-      if (cloudEnabled()) {
-        setCloudStatus("Cloud: syncing...");
-        await pushEntryToCloud(profileId, dateStr);
-        setCloudStatus("Cloud: synced", "ok");
-      }
-      flashSaved(`Saved for ${PROFILE_META[profileId].name} ✓`);
-    } catch (err) {
-      setCloudStatus("Cloud: sync failed", "error");
+    const synced = await syncEntry(profileId, dateStr);
+    if (synced === false) {
       flashSaved("Saved locally (cloud failed)");
-      console.error(err);
+    } else {
+      flashSaved(`Saved for ${PROFILE_META[profileId].name} ✓`);
     }
   });
 
@@ -289,15 +361,7 @@ function bindLog() {
       setCloudStatus("Cloud: local only (configure Supabase)");
       return;
     }
-    try {
-      setCloudStatus("Cloud: syncing...");
-      await pullCloudToLocal();
-      renderActiveView();
-      setCloudStatus("Cloud: synced", "ok");
-    } catch (err) {
-      setCloudStatus("Cloud: sync failed", "error");
-      console.error(err);
-    }
+    await syncFromCloud();
   });
 }
 
@@ -654,7 +718,7 @@ function bindTabs() {
       $$(".tab").forEach((t) => t.classList.toggle("active", t === tab));
       $$(".view").forEach((v) => v.classList.add("hidden"));
       $(`#view-${view}`).classList.remove("hidden");
-      const titles = { log: "Today", stats: "Stats", history: "History" };
+      const titles = { log: "Log", stats: "Stats", history: "History" };
       $("#topTitle").textContent = titles[view];
       renderActiveView();
     });
@@ -664,6 +728,7 @@ function bindTabs() {
 // ---------- init ----------
 async function initApp() {
   $$(".profile-btn").forEach((b) => b.classList.toggle("active", b.dataset.profile === activeProfile()));
+  bindLogDateControls();
   bindLog();
   bindTabs();
   bindProfileSwitch();
@@ -673,9 +738,7 @@ async function initApp() {
   if (cloudEnabled()) {
     setCloudStatus("Cloud: connecting...");
     try {
-      await pullCloudToLocal();
-      renderActiveView();
-      setCloudStatus("Cloud: synced", "ok");
+      await syncFromCloud();
     } catch (err) {
       setCloudStatus("Cloud: sync failed", "error");
       console.error(err);
@@ -687,18 +750,20 @@ async function initApp() {
   document.addEventListener("visibilitychange", async () => {
     if (!document.hidden) {
       store = loadStore();
+      currentLogDate = clampLogDate(currentLogDate);
       $$(".profile-btn").forEach((b) => b.classList.toggle("active", b.dataset.profile === activeProfile()));
       if (cloudEnabled()) {
-        try {
-          await pullCloudToLocal();
-          setCloudStatus("Cloud: synced", "ok");
-        } catch {
-          setCloudStatus("Cloud: sync failed", "error");
-        }
+        await syncFromCloud({ silent: true });
       }
       renderActiveView();
     }
   });
+
+  if (cloudEnabled()) {
+    window.setInterval(() => {
+      if (!document.hidden) syncFromCloud({ silent: true });
+    }, 60000);
+  }
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

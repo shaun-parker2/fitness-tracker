@@ -30,6 +30,19 @@
     <!-- ====================== LOG VIEW ====================== -->
     <section id="view-log" class="view">
       <div class="card">
+        <label for="logDate" class="card-label">Log date</label>
+        <div class="date-nav">
+          <button id="prevDayBtn" class="btn btn-secondary date-btn" type="button">Prev</button>
+          <input id="logDate" type="date" />
+          <button id="nextDayBtn" class="btn btn-secondary date-btn" type="button">Next</button>
+        </div>
+        <div class="date-meta">
+          <button id="todayBtn" class="btn btn-secondary btn-small" type="button">Jump to today</button>
+          <span id="logDateLabel" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="card">
         <label for="weight" class="card-label">Weight (kg) — <span id="logWho">Shaun</span></label>
         <input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 92.4" />
       </div>
@@ -66,7 +79,7 @@
         <textarea id="note" rows="3" placeholder="How did today go? What did you eat?"></textarea>
       </div>
 
-      <button id="submitBtn" class="btn btn-submit">Save today</button>
+      <button id="submitBtn" class="btn btn-submit">Save entry</button>
       <div id="savedHint" class="saved-hint">Saved ✓</div>
       <div class="cloud-row">
         <span id="cloudStatus" class="cloud-status">Cloud: local only</span>

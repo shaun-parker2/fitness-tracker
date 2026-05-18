@@ -99,7 +99,7 @@ main { padding: 14px; max-width: 720px; margin: 0 auto; }
   display: block;
 }
 
-input[type=number], textarea {
+input[type=number], input[type=date], textarea {
   width: 100%;
   background: var(--bg-elev-2);
   color: var(--text);
@@ -110,8 +110,34 @@ input[type=number], textarea {
   font-family: inherit;
   outline: none;
 }
-input[type=number]:focus, textarea:focus { border-color: var(--accent); }
+input[type=number]:focus, input[type=date]:focus, textarea:focus { border-color: var(--accent); }
+input[type=date] {
+  min-width: 0;
+  font-size: 16px;
+}
 textarea { resize: vertical; }
+
+.date-nav {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.date-btn {
+  padding: 12px 14px;
+  font-size: 14px;
+}
+.date-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.date-meta {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
 
 /* KPI buttons */
 .kpi-grid { display: grid; gap: 10px; margin-bottom: 12px; }
@@ -350,3 +376,17 @@ textarea { resize: vertical; }
 }
 .tab span { font-size: 22px; }
 .tab.active { color: var(--accent); }
+
+@media (max-width: 480px) {
+  .date-nav {
+    grid-template-columns: 1fr 1fr;
+  }
+  .date-nav input[type=date] {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+  .date-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

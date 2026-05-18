@@ -1,6 +1,8 @@
-# Trend
+# Shaun & Jemma's Tracker
 
-A tiny personal fitness tracker. Zero accounts, zero servers — a Progressive Web App that stores everything in your phone's browser.
+A lightweight two-profile fitness tracker PWA for Shaun and Jemma.
+
+**Live app:** https://shaun-parker2.github.io/fitness-tracker/
 
 ## What it tracks
 - **Weight** (daily, charted with a 7-day moving average so noise doesn't demotivate)
@@ -10,12 +12,14 @@ A tiny personal fitness tracker. Zero accounts, zero servers — a Progressive W
   - Exercise (run or weights)
 - **Beers** counter (because Thu–Sun is real life)
 - **Free-text note**
+- **Backfill for missed days** with the date picker on the Log tab
 
 ## What it shows
-- Weight chart (60 days) with 7-day avg overlay
-- Exercise this week: X / 5
-- Last-30-day completion % per KPI
-- Current streak per KPI
+- Weight chart with both profiles and 7-day averages
+- Exercise this week side-by-side
+- Last-30-day KPI completion side-by-side
+- Current streaks side-by-side
+- 21-day traffic-light matrix for all three KPIs
 - Beers total + weekly average
 
 ## Run locally
@@ -53,14 +57,13 @@ git push -u origin main
 ```
 
 ## Data
-- Stored in `localStorage` under key `trend.v1`.
-- **Export JSON** regularly from the History tab (it's your backup).
-- Import JSON to merge a backup back in.
-- Data is **per device / per browser** — if you want it synced across phone + laptop, we'll bolt on Supabase later (~30 lines of code).
+- Local cache is stored in `localStorage` under key `trend.v1`.
+- Shared sync is handled by Supabase when `CLOUD_CONFIG` is populated in `app.js`.
+- Changes auto-push to cloud, and the app auto-pulls while open.
+- **Export JSON** from the History tab as a manual backup.
+- Import JSON merges a backup back in.
 
 ## Roadmap (if you want it later)
-- Supabase sync so phone + laptop share the same data
-- Second profile for your wife
 - Apple Health / Google Fit auto-pull for steps & weight
 - Weekly summary email on Sunday night
 - Configurable KPIs / weight unit
